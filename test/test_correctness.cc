@@ -133,7 +133,7 @@ int main(int argc, char** argv) {
         bool a_t, b_t;
         std::tie(m, n, k, a_t, b_t) = problem;
 
-        if(!test_correctness_helper(m, n, k, a_t, b_t)) {
+        if (!test_correctness_helper(m, n, k, a_t, b_t)) {
             return -1; 
         }
     }
