@@ -7,7 +7,7 @@
 #include "test.h"
 
 template <bool a_t, bool b_t>
-void test_correctness(int m, int n, int k) {
+bool test_correctness(int m, int n, int k) {
     typedef farm::MapOrder Order;
 
     static const Order LhsOrder = a_t ? Order::RowMajor : Order::ColMajor;
@@ -72,7 +72,7 @@ void test_correctness(int m, int n, int k) {
                 std::cout << "The correct result is " 
                           << static_cast<int>(result_uint8(i, j))
                           << std::endl << std::endl;
-                return;
+                return false;
             }
         }
     }
@@ -83,12 +83,14 @@ void test_correctness(int m, int n, int k) {
               << k << ")"
               << " is correct!"
               << std::endl;
+
+    return true;
 }
 
-void test_correctness_helper(int m, int n, int k, bool a_t, bool b_t) {
+bool test_correctness_helper(int m, int n, int k, bool a_t, bool b_t) {
 #define HANDLE_MATRIX_ORDER(ta, tb)                  \
     if (a_t == ta && b_t == tb) {                    \
-        test_correctness<ta, tb>(m, n, k);           \
+        return test_correctness<ta, tb>(m, n, k);    \
     }
 
     HANDLE_MATRIX_ORDER(false, false)
@@ -97,6 +99,7 @@ void test_correctness_helper(int m, int n, int k, bool a_t, bool b_t) {
     HANDLE_MATRIX_ORDER(true, true)
 
 #undef HANDLE_MATRIX_ORDER
+    return false;
 }  
 
 int main(int argc, char** argv) {
@@ -130,7 +133,9 @@ int main(int argc, char** argv) {
         bool a_t, b_t;
         std::tie(m, n, k, a_t, b_t) = problem;
 
-        test_correctness_helper(m, n, k, a_t, b_t);
+        if(!test_correctness_helper(m, n, k, a_t, b_t)) {
+            return -1; 
+        }
     }
 
     return 0;
