@@ -1,0 +1,14 @@
+language: cpp
+
+sudo: required
+
+services:
+  - docker
+
+script:
+  - "bash -ex ./scripts/run_docker_tests.sh"
+
+notifications:
+  email:
+    on_success: change
+    on_failure: always

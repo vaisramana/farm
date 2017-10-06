@@ -1,6 +1,7 @@
 #include <chrono>
 #include <iomanip>
 #include <iostream>
+#include <tuple>
 #include <vector>
 
 #include "../include/farm.h"
