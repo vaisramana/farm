@@ -17,13 +17,10 @@ The main motivation of creating this library is explained in
 [fast-gemv.txt](https://github.com/google/gemmlowp/blob/master/todo/fast-gemv.txt).
 Essentially, gemmlowp is not well optimized for small batch size GEMMs and
 designing specialized ARM kernels could provide significant performance
-improvement. This library is an essential component for the
-[on-device automatic speech recognition](https://github.svail.baidu.com/baidu-research/ondevice-asr)
-(WE SHOULD REPLACE THIS WITH REFERENCE TO OUR PAPER) and enabled the ASR model 
+improvement. This library is an essential component for the on-device automatic speech recognition
 to run real time on ARM processors.
 
-If you use the code in your research, please cite the following paper. (ADD 
-CITATION HERE)
+If you use the code in your research, please cite [this paper](https://arxiv.org/abs/1710.09026).
 
 # Public Interface
 
