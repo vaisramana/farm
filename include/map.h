@@ -58,6 +58,33 @@ public:
         return MatrixMap(data(start_row, start_col), block_rows, block_cols,
                          stride_);
     }
+
+    void print() {
+        for(int i=0; i<rows_; i++) {
+            for(int j=0; j<cols_; j++) {
+                printf("%d ", data_[i*cols_+j]);
+            }
+            printf("\n");
+        }
+    }
+
+    void print16() {
+        for(int i=0; i<rows_; i++) {
+            for(int j=0; j<cols_/2; j++) {
+                printf("%d ", ((std::uint16_t *)data_)[i*cols_/2+j]);
+            }
+            printf("\n");
+        }
+    }
+
+    void print32() {
+        for(int i=0; i<rows_; i++) {
+            for(int j=0; j<cols_/4; j++) {
+                printf("%d ", ((std::uint32_t *)data_)[i*cols_/4+j]);
+            }
+            printf("\n");
+        }
+    }
 };	
     
 }  // namespace farm
