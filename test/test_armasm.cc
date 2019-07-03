@@ -3,6 +3,247 @@
 #include <limits>
 #include <cmath>
 #include "../include/farm.h"
+#include <arm_neon.h>
+
+
+void print_uint8x8(uint8x8_t v, std::string comment) {
+    printf("======== knife %s ========\n", comment.c_str());
+    printf("%d ", vget_lane_u8(v, 0));
+    printf("%d ", vget_lane_u8(v, 1));
+    printf("%d ", vget_lane_u8(v, 2));
+    printf("%d ", vget_lane_u8(v, 3));
+    printf("%d ", vget_lane_u8(v, 4));
+    printf("%d ", vget_lane_u8(v, 5));
+    printf("%d ", vget_lane_u8(v, 6));
+    printf("%d ", vget_lane_u8(v, 7));
+    printf("\n");
+}
+
+void print_int16x4(int16x4_t v, std::string comment) {
+    printf("======== knife %s ========\n", comment.c_str());
+    printf("%d ", vget_lane_s16(v, 0));
+    printf("%d ", vget_lane_s16(v, 1));
+    printf("%d ", vget_lane_s16(v, 2));
+    printf("%d ", vget_lane_s16(v, 3));
+    printf("\n");
+}
+
+
+void print_int16x8(int16x8_t v, std::string comment) {
+    printf("======== knife %s ========\n", comment.c_str());
+    printf("%d ", vgetq_lane_s16(v, 0));
+    printf("%d ", vgetq_lane_s16(v, 1));
+    printf("%d ", vgetq_lane_s16(v, 2));
+    printf("%d ", vgetq_lane_s16(v, 3));
+    printf("%d ", vgetq_lane_s16(v, 4));
+    printf("%d ", vgetq_lane_s16(v, 5));
+    printf("%d ", vgetq_lane_s16(v, 6));
+    printf("%d ", vgetq_lane_s16(v, 7));
+    printf("\n");
+}
+
+void print_int32x4(int32x4_t v, std::string comment) {
+    printf("======== knife %s ========\n", comment.c_str());
+    printf("%d ", vgetq_lane_s32(v, 0));
+    printf("%d ", vgetq_lane_s32(v, 1));
+    printf("%d ", vgetq_lane_s32(v, 2));
+    printf("%d ", vgetq_lane_s32(v, 3));
+    printf("\n");
+}
+
+
+
+// int32_t MAC_I16X8(int16x8_t lhs_i16x8, int16x8_t rhs_i16x8, int32x4_t dst_i32x4){  
+//     dst_i32x4 = vmlal_high_s16(dst_i32x4, lhs_i16x8, rhs_i16x8);
+//     dst_i32x4 = vmlal_s16(dst_i32x4, vget_low_s16(lhs_i16x8), vget_low_s16(rhs_i16x8)); 
+//     return vaddvq_s32(dst_i32x4);  
+// }
+
+#define MAC_I16X8(lhs_i16x8, rhs_i16x8, dst_i32x4){                                       \
+    dst_i32x4 = vmlal_high_s16(dst_i32x4, lhs_i16x8, rhs_i16x8);                          \
+    dst_i32x4 = vmlal_s16(dst_i32x4, vget_low_s16(lhs_i16x8), vget_low_s16(rhs_i16x8));   \
+}
+
+
+
+
+void test_intrinsics(std::uint8_t* lhs_ptr, std::uint8_t* rhs_ptr,
+        std::uint8_t* dst_ptr, std::size_t run_depth, std::size_t rows,
+        std::int16_t* lhs_offset, std::int16_t* rhs_offset,
+        std::int32_t res_offset, std::int32_t res_mul,
+        std::int32_t res_shift)
+{
+
+    assert(run_depth%8 == 0);
+    // input lhs/rhs data with type uint8, so it safe to cast uint8 -> uint16 -> int16
+    // int16x4_t vreinterpret_s16_u16 (uint16x4_t a)
+    int32x4_t acc_i32x4_11 = vdupq_n_s32 (0);
+    int32x4_t acc_i32x4_12 = vdupq_n_s32 (0);
+    int32x4_t acc_i32x4_13 = vdupq_n_s32 (0);
+    int32x4_t acc_i32x4_14 = vdupq_n_s32 (0);
+    int32x4_t acc_i32x4_21 = vdupq_n_s32 (0);
+    int32x4_t acc_i32x4_22 = vdupq_n_s32 (0);
+    int32x4_t acc_i32x4_23 = vdupq_n_s32 (0);
+    int32x4_t acc_i32x4_24 = vdupq_n_s32 (0);
+    int32x4_t acc_i32x4_31 = vdupq_n_s32 (0);
+    int32x4_t acc_i32x4_32 = vdupq_n_s32 (0);
+    int32x4_t acc_i32x4_33 = vdupq_n_s32 (0);
+    int32x4_t acc_i32x4_34 = vdupq_n_s32 (0);
+    int32x4_t acc_i32x4_41 = vdupq_n_s32 (0);
+    int32x4_t acc_i32x4_42 = vdupq_n_s32 (0);
+    int32x4_t acc_i32x4_43 = vdupq_n_s32 (0);
+    int32x4_t acc_i32x4_44 = vdupq_n_s32 (0);
+
+    for(int c=0; c<run_depth; c+=8) {
+        std::uint8_t* ptr_tmp = lhs_ptr + c;
+        int16x8_t lhs_i16x8_1 = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(ptr_tmp)));
+        ptr_tmp += run_depth;
+        int16x8_t lhs_i16x8_2 = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(ptr_tmp)));
+        ptr_tmp += run_depth;
+        int16x8_t lhs_i16x8_3 = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(ptr_tmp)));
+        ptr_tmp += run_depth;
+        int16x8_t lhs_i16x8_4 = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(ptr_tmp)));
+
+        ptr_tmp = rhs_ptr;
+        int16x8_t rhs_i16x8_1 = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(ptr_tmp)));
+        ptr_tmp += run_depth;
+        int16x8_t rhs_i16x8_2 = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(ptr_tmp)));
+        ptr_tmp += run_depth;
+        int16x8_t rhs_i16x8_3 = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(ptr_tmp)));
+        ptr_tmp += run_depth;
+        int16x8_t rhs_i16x8_4 = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(ptr_tmp)));
+
+
+        
+        int32_t acc_i32_11,acc_i32_22,acc_i32_33,acc_i32_44;
+
+        // apply offset
+
+        int16x8_t lhs_offset_i16x8 = vld1q_dup_s16(lhs_offset);
+        int16x8_t rhs_offset_i16x8 = vld1q_dup_s16(rhs_offset);
+        lhs_i16x8_1 = vaddq_s16(lhs_i16x8_1, lhs_offset_i16x8);
+        lhs_i16x8_2 = vaddq_s16(lhs_i16x8_2, lhs_offset_i16x8);
+        lhs_i16x8_3 = vaddq_s16(lhs_i16x8_3, lhs_offset_i16x8);
+        lhs_i16x8_4 = vaddq_s16(lhs_i16x8_4, lhs_offset_i16x8);
+        rhs_i16x8_1 = vaddq_s16(rhs_i16x8_1, rhs_offset_i16x8);
+        rhs_i16x8_2 = vaddq_s16(rhs_i16x8_2, rhs_offset_i16x8);
+        rhs_i16x8_3 = vaddq_s16(rhs_i16x8_3, rhs_offset_i16x8);
+        rhs_i16x8_4 = vaddq_s16(rhs_i16x8_4, rhs_offset_i16x8);
+
+        
+        // print_int16x8(lhs_i16x8_1, "lhs_i16x8_1");
+        // print_int16x8(rhs_i16x8_1, "rhs_i16x8_1");
+
+
+        MAC_I16X8(lhs_i16x8_1, rhs_i16x8_1, acc_i32x4_11);
+        MAC_I16X8(lhs_i16x8_1, rhs_i16x8_2, acc_i32x4_12);
+        MAC_I16X8(lhs_i16x8_1, rhs_i16x8_3, acc_i32x4_13);
+        MAC_I16X8(lhs_i16x8_1, rhs_i16x8_4, acc_i32x4_14);
+        MAC_I16X8(lhs_i16x8_2, rhs_i16x8_1, acc_i32x4_21);
+        MAC_I16X8(lhs_i16x8_2, rhs_i16x8_2, acc_i32x4_22);
+        MAC_I16X8(lhs_i16x8_2, rhs_i16x8_3, acc_i32x4_23);
+        MAC_I16X8(lhs_i16x8_2, rhs_i16x8_4, acc_i32x4_24);
+        MAC_I16X8(lhs_i16x8_3, rhs_i16x8_1, acc_i32x4_31);
+        MAC_I16X8(lhs_i16x8_3, rhs_i16x8_2, acc_i32x4_32);
+        MAC_I16X8(lhs_i16x8_3, rhs_i16x8_3, acc_i32x4_33);
+        MAC_I16X8(lhs_i16x8_3, rhs_i16x8_4, acc_i32x4_34);
+        MAC_I16X8(lhs_i16x8_4, rhs_i16x8_1, acc_i32x4_41);
+        MAC_I16X8(lhs_i16x8_4, rhs_i16x8_2, acc_i32x4_42);
+        MAC_I16X8(lhs_i16x8_4, rhs_i16x8_3, acc_i32x4_43);
+        MAC_I16X8(lhs_i16x8_4, rhs_i16x8_4, acc_i32x4_44);
+    }
+
+    // row 1
+    int16x8_t res_offset_i16x8 = vdupq_n_s16(res_offset);
+    int32x4_t sum_row1 = vdupq_n_s32 (0);
+    int32_t sum_i32_11 = vaddvq_s32(acc_i32x4_11);
+    sum_row1 = vld1q_lane_s32(&sum_i32_11, sum_row1, 0);
+    int32_t sum_i32_12 = vaddvq_s32(acc_i32x4_12);
+    sum_row1 = vld1q_lane_s32(&sum_i32_12, sum_row1, 1);
+    int32_t sum_i32_13 = vaddvq_s32(acc_i32x4_13);
+    sum_row1 = vld1q_lane_s32(&sum_i32_13, sum_row1, 2);
+    int32_t sum_i32_14 = vaddvq_s32(acc_i32x4_14);
+    sum_row1 = vld1q_lane_s32(&sum_i32_14, sum_row1, 3);
+    // print_int32x4(sum_row1, "sum_row1 add");
+    // sum * res_mul / 2^31
+    sum_row1 = vqrdmulhq_n_s32(sum_row1, res_mul);
+    // print_int32x4(sum_row1, "sum_row1 vqrdmulhq_n_s32");
+    sum_row1 = vshlq_n_s32(sum_row1, res_shift);
+    // print_int32x4(sum_row1, "sum_row1 vshlq_n_s32");
+    
+    // row 2
+    int32x4_t sum_row2 = vdupq_n_s32 (0);
+    int32_t sum_i32_21 = vaddvq_s32(acc_i32x4_21);
+    sum_row2 = vld1q_lane_s32(&sum_i32_21, sum_row2, 0);
+    int32_t sum_i32_22 = vaddvq_s32(acc_i32x4_22);
+    sum_row2 = vld1q_lane_s32(&sum_i32_22, sum_row2, 1);
+    int32_t sum_i32_23 = vaddvq_s32(acc_i32x4_23);
+    sum_row2 = vld1q_lane_s32(&sum_i32_23, sum_row2, 2);
+    int32_t sum_i32_24 = vaddvq_s32(acc_i32x4_24);
+    sum_row2 = vld1q_lane_s32(&sum_i32_24, sum_row2, 3);
+    // print_int32x4(sum_row2, "sum_row2 add");
+    sum_row2 = vqrdmulhq_n_s32(sum_row2, res_mul);
+    sum_row2 = vshlq_n_s32(sum_row2, res_shift);
+    // print_int32x4(sum_row2, "sum_row2 vshlq_n_s32");
+
+    int16x8_t sum_row12_i16x8 = vqaddq_s16(vqmovn_high_s32(vqmovn_s32(sum_row1),sum_row2),res_offset_i16x8);
+    // print_int16x8(sum_row12_i16x8, "sum_row12_i16x8");
+    uint8x8_t sum_row12_u8x8 = vqmovun_s16(sum_row12_i16x8);
+    // print_uint8x8(sum_row12_u8x8, "sum_row12_u8x8");
+    vst1_lane_u8(dst_ptr, sum_row12_u8x8, 0);
+    vst1_lane_u8(dst_ptr+1, sum_row12_u8x8, 1);
+    vst1_lane_u8(dst_ptr+2, sum_row12_u8x8, 2);
+    vst1_lane_u8(dst_ptr+3, sum_row12_u8x8, 3);
+    dst_ptr += 8;
+    vst1_lane_u8(dst_ptr, sum_row12_u8x8, 4);
+    vst1_lane_u8(dst_ptr+1, sum_row12_u8x8, 5);
+    vst1_lane_u8(dst_ptr+2, sum_row12_u8x8, 6);
+    vst1_lane_u8(dst_ptr+3, sum_row12_u8x8, 7);
+
+
+    // row 3
+    int32x4_t sum_row3 = vdupq_n_s32 (0);
+    int32_t sum_i32_31 = vaddvq_s32(acc_i32x4_31);
+    sum_row2 = vld1q_lane_s32(&sum_i32_31, sum_row3, 0);
+    int32_t sum_i32_32 = vaddvq_s32(acc_i32x4_32);
+    sum_row2 = vld1q_lane_s32(&sum_i32_32, sum_row3, 1);
+    int32_t sum_i32_33 = vaddvq_s32(acc_i32x4_33);
+    sum_row2 = vld1q_lane_s32(&sum_i32_33, sum_row3, 2);
+    int32_t sum_i32_34 = vaddvq_s32(acc_i32x4_34);
+    sum_row3 = vld1q_lane_s32(&sum_i32_34, sum_row3, 3);
+    sum_row3 = vqrdmulhq_n_s32(sum_row3, res_mul);
+    sum_row3 = vshlq_n_s32(sum_row3, res_shift);
+    
+    // row 4
+    int32x4_t sum_row4 = vdupq_n_s32 (0);
+    int32_t sum_i32_41 = vaddvq_s32(acc_i32x4_41);
+    sum_row4 = vld1q_lane_s32(&sum_i32_41, sum_row4, 0);
+    int32_t sum_i32_42 = vaddvq_s32(acc_i32x4_42);
+    sum_row4 = vld1q_lane_s32(&sum_i32_42, sum_row4, 1);
+    int32_t sum_i32_43 = vaddvq_s32(acc_i32x4_43);
+    sum_row4 = vld1q_lane_s32(&sum_i32_43, sum_row4, 2);
+    int32_t sum_i32_44 = vaddvq_s32(acc_i32x4_44);
+    sum_row4 = vld1q_lane_s32(&sum_i32_44, sum_row4, 3);
+    sum_row4 = vqrdmulhq_n_s32(sum_row4, res_mul);
+    sum_row4 = vshlq_n_s32(sum_row4, res_shift);
+
+    int16x8_t sum_row34_i16x8 = vqaddq_s16(vqmovn_high_s32(vqmovn_s32(sum_row3),sum_row4),res_offset_i16x8);
+    // print_int16x8(sum_row34_i16x8, "sum_row34_i16x8");
+    uint8x8_t sum_row34_u8x8 = vqmovun_s16(sum_row34_i16x8);
+    // print_uint8x8(sum_row34_u8x8, "sum_row34_u8x8");
+    dst_ptr += 8;
+    vst1_lane_u8(dst_ptr, sum_row34_u8x8, 0);
+    vst1_lane_u8(dst_ptr+1, sum_row34_u8x8, 1);
+    vst1_lane_u8(dst_ptr+2, sum_row34_u8x8, 2);
+    vst1_lane_u8(dst_ptr+3, sum_row34_u8x8, 3);
+    dst_ptr += 8;
+    vst1_lane_u8(dst_ptr, sum_row34_u8x8, 4);
+    vst1_lane_u8(dst_ptr+1, sum_row34_u8x8, 5);
+    vst1_lane_u8(dst_ptr+2, sum_row34_u8x8, 6);
+    vst1_lane_u8(dst_ptr+3, sum_row34_u8x8, 7);
+
+}
+
 
 
 void test(std::uint8_t* lhs_ptr, std::uint8_t* rhs_ptr,
@@ -126,7 +367,7 @@ void test(std::uint8_t* lhs_ptr, std::uint8_t* rhs_ptr,
 }
 
 
-#define TEST_ROW (1)
+#define TEST_ROW (4)
 #define TEST_DEPTH (8)
 #define TEST_COL (8)
 
@@ -139,8 +380,8 @@ int main()
 
     std::size_t run_depth = TEST_DEPTH;
     std::size_t rows = TEST_ROW;
-    std::int16_t lhs_offset = 0;
-    std::int16_t rhs_offset = 0;
+    std::int16_t lhs_offset = -1;
+    std::int16_t rhs_offset = 2;
     std::int32_t res_offset = 3;
     
 #ifdef NEW_QUANTIZE_METHOD
@@ -171,16 +412,29 @@ int main()
     farm::MatrixMap<farm::MapOrder::ColMajor> result(result_data, TEST_ROW, TEST_COL);
     farm::MatrixMap<farm::MapOrder::ColMajor> result_ref(result_ref_data, TEST_ROW, TEST_COL);
 
-    /*
-    test(lhs_data, rhs_data, result_data, 
+    
+    // test(lhs_data, rhs_data, result_data, 
+    test_intrinsics(lhs_data, rhs_data, result_ref_data, 
          run_depth, rows,
          &lhs_offset, &rhs_offset,
          res_offset, res_mul, -res_shift);
-    */
+    printf("result_ref:\n");
+    result_ref.print();
+
+    farm::gemm_4_kernel_run(lhs.data(), rhs.data(),
+                            result.data(), lhs.cols(), lhs.rows(),
+                            &lhs_offset, &rhs_offset,
+                            res_offset, res_mul,
+                            -res_shift);
+    
+    printf("lhs_offset %d rhs_offset %d res_offset %d res_mul %d res_shift %d\n", 
+            lhs_offset, rhs_offset, res_offset, res_mul, res_shift);
     printf("lhs:\n");
     lhs.print();
     printf("rhs:\n");
     rhs.print();
+    printf("result:\n");
+    result.print();
 
     /*
     printf("gevv_kernel_run test\n");    
@@ -189,6 +443,8 @@ int main()
                     (&lhs_offset), (&rhs_offset),
                     res_offset, res_mul, -res_shift);
     */
+
+#if 0
     printf("SingleThreadGemm test\n");
     farm::SingleThreadGemm(lhs, rhs, &result, 
                           lhs_offset, rhs_offset, res_offset,
@@ -200,7 +456,7 @@ int main()
     //result.print16();
     //printf("\nresult 32-bit:\n");
     //result.print32();
-
+#endif
     // Calculate result_uint8 as the correct gemm output
     for (int i = 0; i < TEST_ROW; i++) {
         for (int j = 0; j < TEST_COL; j++) {
@@ -211,9 +467,8 @@ int main()
             }
 #ifdef NEW_QUANTIZE_METHOD   
             double mul = static_cast<double>(res_mul)/(1ll<<31);        
-            double res = static_cast<double>((temp * mul) + res_offset) / 
-                         static_cast<double>(pow(2.0, res_shift));
-            printf("(%dx%d(%lf)+%d)>>%d = %lf\n", temp, res_mul, mul, res_offset, res_shift, res);             
+            double res = static_cast<double>(temp * mul)/static_cast<double>(pow(2.0, res_shift)) + res_offset;
+            // printf("(%dx%d(%lf)+%d)>>%d = %lf\n", temp, res_mul, mul, res_offset, res_shift, res);             
 #else
             double res = static_cast<double>((temp + res_offset) * res_mul) / 
                          static_cast<double>(pow(2.0, res_shift));
